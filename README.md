@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # net-http-analyzer
 Performs automated HTTP request analysis to detect vulnerabilities like XSS, SQL injection, and exposed sensitive information based on response content. - Focused on Basic network operations
 
