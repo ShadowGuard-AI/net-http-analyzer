@@ -38,6 +38,7 @@ def is_valid_url(url):
     """
     try:
         result = urlparse(url)
+        # This check is only about shape. It passes plenty of URLs that will not answer, and it rejects nothing on content, so a pass here never means the target is safe or real.
         return all([result.scheme, result.netloc])
     except:
         return False
@@ -55,6 +56,7 @@ def test_xss(url, session):
     try:
         response = session.get(url, params={"xss": xss_payload}, timeout=10)
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+        # I look for the payload back verbatim. Escaped or encoded reflection does not match this string, so this test only catches the plainest reflection and a clean result says very little.
         if xss_payload in response.text:
             logging.warning(f"Possible XSS vulnerability detected at {url} with payload: {xss_payload}")
         else:
@@ -75,6 +77,7 @@ def test_sqli(url, session):
     try:
         response = session.get(url, params={"sql": sqli_payload}, timeout=10)
         response.raise_for_status()
+        # That one error string is the whole signal here. Other database errors, silent failures, and blind cases all read as a pass, which is a limit of this check I want stated next to it.
         if "error in your SQL syntax" in response.text.lower():
             logging.warning(f"Possible SQL Injection vulnerability detected at {url} with payload: {sqli_payload}")
         else:
@@ -91,6 +94,7 @@ def detect_sensitive_info(url, response):
     Returns:
         None
     """
+    # These words match ordinary login pages and documentation just as easily as a real leak. I treat a hit as a reason to look by eye, never as proof anything sensitive was exposed.
     sensitive_patterns = ["password", "secret", "api_key", "credit card", "ssn"]
     try:
         content = response.text.lower()
@@ -111,10 +115,12 @@ def basic_fuzzing(url, session):
     """
     common_paths = ["/admin", "/login", "/config.php", "/.git/", "/.env"]
     for path in common_paths:
+        # urljoin can surprise people: if the base URL has no trailing path segment, the join replaces instead of appends. I accept that here because the paths are absolute and that replacement is what I want.
         fuzzed_url = urljoin(url, path)
         try:
             response = session.get(fuzzed_url, timeout=10)
             response.raise_for_status()
+            # Calling raise_for_status just above means this 404 branch never runs. A 404 lands in the RequestException handler and is logged at debug, so the fuzz output stays quiet for missing paths by accident of that order.
             if response.status_code != 404:  # Check for other status codes than 404
                 logging.info(f"Found interesting resource at {fuzzed_url} - Status code: {response.status_code}")
                 detect_sensitive_info(fuzzed_url, response) #check the response content for sensitive information
@@ -150,6 +156,7 @@ def analyze_http_request(url, method="GET", data=None, timeout=10, verbose=False
 
     try:
         with requests.Session() as session:
+            # I name the tool in the user agent on purpose. A server that blocks this string is telling me something, and hiding behind a browser string would make the scan dishonest to whoever runs that server.
             session.headers.update({'User-Agent': 'net-http-analyzer/1.0'}) #Set a user agent
 
             if method == "GET":
@@ -172,6 +179,7 @@ def analyze_http_request(url, method="GET", data=None, timeout=10, verbose=False
 
             logging.info(f"Request to {url} successful. Status code: {response.status_code}")
 
+            # The order matters to the output, not to the result: the base response is checked first, then the active tests make their own requests. Each test opens a fresh request, so a stateful target can answer them differently from the first response.
             if sensitive:
                 detect_sensitive_info(url, response)
             if xss:
