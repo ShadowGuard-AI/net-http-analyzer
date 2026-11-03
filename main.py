@@ -15,7 +15,7 @@ def setup_argparse():
         argparse.ArgumentParser: The configured argument parser.
     """
     parser = argparse.ArgumentParser(description="Performs automated HTTP request analysis to detect vulnerabilities.",
-                                     epilog="Example usage: python net_http_analyzer.py -u http://example.com")
+                                     epilog="Example usage: python3 main.py -u http://example.com")
     parser.add_argument("-u", "--url", required=True, help="The URL to analyze.")
     parser.add_argument("-d", "--data", help="The data to send in a POST request (e.g., 'param1=value1&param2=value2').")
     parser.add_argument("-m", "--method", default="GET", choices=["GET", "POST"], help="The HTTP method to use (default: GET).")
